@@ -496,15 +496,6 @@
       background: transparent;
       box-shadow: none;
     }
-    .model-stage::before {
-      position: absolute;
-      z-index: 2;
-      inset: 5% 2%;
-      content: "";
-      pointer-events: none;
-      opacity: .34;
-      background: repeating-radial-gradient(ellipse at 50% 53%, transparent 0 30px, rgba(86, 62, 31, .17) 31px 32px, transparent 33px 52px);
-    }
     .model-stage::after { display: none; }
     .model-stage canvas { filter: drop-shadow(0 18px 12px rgba(60, 42, 20, .28)); }
     .model-head, .model-foot { right: 3%; left: 3%; }
@@ -894,7 +885,7 @@
       .plate-note { min-height: 0; }
     }
 
-  #archive-fx,.plate-dialog .sigil{--size:76px;--color:#ffe4a1;position:fixed;inset:0;pointer-events:none;z-index:100}
+  #archive-fx,.plate-dialog .sigil{--size:30.4px;--color:#ffcf68;position:fixed;inset:0;pointer-events:none;z-index:100}
 
   /* 单个法阵容器：定位在落点，宽高为 0 */
   .sigil{position:fixed;width:0;height:0;pointer-events:none}
@@ -906,12 +897,12 @@
     margin:calc(var(--size) * -.7) 0 0 calc(var(--size) * -.7);
     border-radius:50%;
     background:radial-gradient(circle,
-      rgba(255,241,206,.55) 0%,
-      rgba(244,212,148,.30) 14%,
-      rgba(212,163,115,.16) 30%,
-      rgba(180,130,70,.06) 48%,
+      rgba(255,241,206,.9) 0%,
+      rgba(244,212,148,.65) 14%,
+      rgba(212,163,115,.34) 30%,
+      rgba(180,130,70,.14) 48%,
       rgba(0,0,0,0) 70%);
-    filter:blur(4px);
+    filter:blur(1.5px);
     animation:bloom 820ms cubic-bezier(.16,.8,.28,1) forwards;
   }
   @keyframes bloom{
@@ -945,9 +936,8 @@
     margin:calc(var(--size) * -.5) 0 0 calc(var(--size) * -.5);
     color:var(--color);
     filter:
-      drop-shadow(0 0 2px rgba(255,238,200,.95))
-      drop-shadow(0 0 8px rgba(232,198,126,.7))
-      drop-shadow(0 0 20px rgba(196,148,80,.4));
+      drop-shadow(0 0 1px #613508)
+      drop-shadow(0 0 3px rgba(241,176,61,.88));
     animation:cast 820ms cubic-bezier(.16,.8,.28,1) forwards;
     will-change:transform,opacity;
     backface-visibility:hidden;
@@ -956,11 +946,13 @@
     0%  {transform:scale(.45) rotate(var(--rot,-10deg));opacity:0}
     9%  {opacity:1}
     22% {transform:scale(.88) rotate(0deg);opacity:1}
-    72% {opacity:.9}
+    72% {opacity:1}
     100%{transform:scale(1.35) rotate(calc(var(--rot,10deg) * -1));opacity:0}
   }
 
   .sigil svg{display:block;width:100%;height:100%;overflow:visible}
+  .sigil svg [stroke-width]{stroke-width:7;opacity:.95}
+  .sigil svg .ring-outer > circle{stroke-width:9}
 
   /* 三层环反向旋转 */
   .ring-outer,.ring-inner,.ring-core{
@@ -976,7 +968,7 @@
     .case {
       position: relative;
       isolation: isolate;
-      padding-inline: clamp(12px, 2.5vw, 32px);
+      padding-inline: calc(max(28px, (100% - var(--content-width)) / 2) + clamp(12px, 2.5vw, 32px));
     }
     .case-atlas {
       position: absolute;
@@ -1034,8 +1026,11 @@
     .plate-dialog .plate-actions button { width: 44px; height: 44px; }
     .plate-dialog.is-closing { pointer-events: none; }
     html:has(.plate-dialog[open]) { overflow: hidden; }
+    @media (max-width: 900px) {
+      .case { padding-inline: calc(18px + clamp(12px, 2.5vw, 32px)); }
+    }
     @media (max-width: 680px) {
-      .case { padding-inline: 8px; }
+      .case { padding-inline: 20px; }
       .case-atlas img { object-position: 63% 18%; }
       .case .case-atlas::after {
         background: linear-gradient(rgba(241, 227, 195, .08) 10%, rgba(241, 227, 195, .84) 52%, rgba(241, 227, 195, .95) 90%);
@@ -1103,8 +1098,8 @@
           <div><p class="section-index">01 / BUILDING CHRONOLOGY</p><h2>按建成时间翻阅场馆</h2></div>
           <p>从 1964 年的悬索体育馆，到 2022 年启用的世界杯主场馆，依次记录建成节点、结构选择与空间经验。</p>
         </div>
-        <div id="case-list"></div>
       </div>
+      <div id="case-list"></div>
     </section>
   </main>
 
@@ -6702,7 +6697,10 @@
     let camera = null;
     let initialPosition = null;
     try {
-      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
+      const renderer = new THREE.WebGLRenderer({
+        canvas, antialias: true, alpha: true, powerPreference: "high-performance",
+        preserveDrawingBuffer: true,
+      });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       renderer.outputEncoding = THREE.sRGBEncoding;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -6727,9 +6725,19 @@
         renderFrame = requestAnimationFrame(() => {
           renderFrame = 0;
           renderer.render(scene, camera);
+          if (initialPosition && !renderer.getContext().isContextLost() && renderer.info.render.triangles > 0) {
+            modelStage.classList.add("is-ready");
+            if (modelStatus.textContent !== "三维模型已加载") modelStatus.textContent = "三维模型已加载";
+          }
         });
       };
       controls.addEventListener("change", requestModelRender);
+      canvas.addEventListener("webglcontextlost", (event) => {
+        event.preventDefault();
+        modelStage.classList.remove("is-ready");
+        modelStatus.textContent = "三维显示暂时中断，已显示场馆照片";
+      });
+      canvas.addEventListener("webglcontextrestored", requestModelRender);
       const resizeRenderer = () => {
         const width = modelStage.clientWidth;
         const height = modelStage.clientHeight;
@@ -6773,8 +6781,6 @@
         initialPosition = camera.position.clone();
         controls.saveState();
         requestModelRender();
-        modelStage.classList.add("is-ready");
-        modelStatus.textContent = "三维模型已加载";
       }, (error) => {
         modelStatus.textContent = "模型无法加载，已显示场馆照片";
         console.error("GLB parse failed", error);
